@@ -349,8 +349,11 @@ class Node( object ):
         debug( '\n' )
         debug( 'added intf %s:%d to node %s\n' % ( intf, port, self.name ) )
         if self.inNamespace:
-            debug( 'moving', intf, 'into namespace for', self.name, '\n' )
-            moveIntf( intf.name, self )
+            if hasattr( intf, 'delayedMove' ) and intf.delayedMove is True:
+                pass
+            else:
+                debug( 'moving', intf, 'into namespace for', self.name, '\n' )
+                moveIntf( intf.name, self )
 
     def defaultIntf( self ):
         "Return interface for lowest port"
