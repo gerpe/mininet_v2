@@ -7,7 +7,8 @@ import threading, time
 
 from mininet.log import info, error, warn, debug
 from mininet.link import Intf, Link
-from mininet.node import Switch
+from mininet.node import Switch, Node
+from mininet.util import quietRun, moveIntf, errRun
 
 import ns.core
 import ns.network
@@ -18,22 +19,22 @@ default_duration = 3600
 ns.core.GlobalValue.Bind( "SimulatorImplementationType", ns.core.StringValue( "ns3::RealtimeSimulatorImpl" ) )
 ns.core.GlobalValue.Bind( "ChecksumEnabled", ns.core.BooleanValue ( "true" ) )
 
-allintfs = []
+allIntfs = []
 
 def start():
     global thread
     if 'thread' in globals() and thread.isAlive():
         warn( "NS-3 simulator thread already running." )
         return
-    for intf in allintfs:
-        if not intf.ns_done:
+    for intf in allIntfs:
+        if not intf.nsInstalled:
             intf.nsInstall()
     thread = threading.Thread( target = runthread )
     thread.daemon = True
     thread.start()
-    for intf in allintfs:
-        if not intf.mn_done:
-            intf.mnInstall()
+    for intf in allIntfs:
+        if not intf.inRightNamespace:
+            intf.namespaceMove()
     return
 
 def runthread():
@@ -43,7 +44,7 @@ def runthread():
 def stop():
     ns.core.Simulator.Stop( ns.core.MilliSeconds( 1 ) )
     while thread.isAlive():
-        time.sleep(0.01)
+        time.sleep( 0.01 )
     return
 
 def clear():
@@ -54,45 +55,41 @@ def clear():
 
 
 class TBIntf( Intf ):
-    def  __init__( self, name=None, node=None, port=None, 
-                   ns_node=None, ns_device=None, mode=None, **kwargs ):
+    def  __init__( self, name, node, port=None, 
+                   nsNode=None, nsDevice=None, mode=None, **params ):
         """
         """
-        allintfs.append( self )
         self.name = name
-        self.node = node
-        self.port = port
-        self.ns_node = ns_node
-        self.ns_device = ns_device
+        self.createTap()
+        self.delayedMove = True
+        if node.inNamespace:
+            self.inRightNamespace = False
+        else:
+            self.inRightNamespace = True
+        Intf.__init__( self, name, node, port , **params)
+        allIntfs.append( self )
+        self.nsNode = nsNode
+        self.nsDevice = nsDevice
         self.mode = mode
-        self.kwargs = kwargs
-        self.ns_done = False
-        self.mn_done = False
+        self.params = params
+        self.nsInstalled = False
         self.tapbridge = ns.tap_bridge.TapBridge()
-        if ( self.ns_node and self.ns_device and 
-           ( self.mode or self.node ) and
-           ( self.name or self.node ) ):
+        if self.nsNode and self.nsDevice and ( self.mode or self.node ):
             self.nsInstall()
-        if self.node and self.ns_done and self.isInstant():
-            self.mnInstall()
+        if self.node and self.nsInstalled and self.isInstant(): # instant mode to be implemented in ns-3
+            self.namespaceMove()
+
+    def createTap( self ):
+        quietRun( 'ip tuntap add ' + self.name + ' mode tap' )
 
     def nsInstall( self ):
-        if self.ns_node is None:
-            warn( "Cannot install TBIntf to ns-3 Node; "
-                  "ns_node not specified" )
+        if not isinstance( self.nsNode, ns.network.Node ):
+            warn( "Cannot install TBIntf to ns-3 Node: "
+                  "nsNode not specified\n" )
             return
-        if self.ns_device is None:
-            warn( "Cannot install TBIntf to ns-3 Node; "
-                  "ns_device not specified" )
-            return
-        if self.name is None and self.node is not None:
-            if self.port is None:
-                self.port = self.node.newPort()
-                info( "Port not specified, getting new port from (mininet) node" )
-            self.name = Link.intfName( self.node, self.port )
-        if self.name is None:
-            warn( "Cannot install TBIntf to ns-3 Node; "
-                  "Neither name nor (mininet) node/port specified" )
+        if not isinstance( self.nsDevice, ns.network.NetDevice ):
+            warn( "Cannot install TBIntf to ns-3 Node: "
+                  "nsDevice not specified\n" )
             return
         if self.mode is None and self.node is not None:
             if isinstance( self.node, Switch ):
@@ -100,32 +97,32 @@ class TBIntf( Intf ):
             else:
                 self.mode = "UseLocal"
         if self.mode is None:
-            warn( "Cannot install TBIntf to ns-3 Node; "
-                  "Cannot determine mode: neither mode nor (mininet) node specified" )
+            warn( "Cannot install TBIntf to ns-3 Node: "
+                  "cannot determine mode: neither mode nor (mininet) node specified\n" )
             return
         self.tapbridge.SetAttribute ( "Mode", ns.core.StringValue( self.mode ) )
         self.tapbridge.SetAttribute ( "DeviceName", ns.core.StringValue( self.name ) )
         self.tapbridge.SetAttributeFailSafe ( "Instant", ns.core.BooleanValue( True ) ) # to be implemented in ns-3
-        self.ns_node.AddDevice( self.tapbridge )
-        self.tapbridge.SetBridgedNetDevice( self.ns_device )
-        self.ns_done = True
+        self.nsNode.AddDevice( self.tapbridge )
+        self.tapbridge.SetBridgedNetDevice( self.nsDevice )
+        self.nsInstalled = True
 
-    def mnInstall( self ):
-        if self.node is None:
-            warn( "Cannot install TBIntf to mininet Node; "
-                  "(mininet) node not specified" )
-            return
-        if self.node.inNamespace:
-            loops = 0
-            while not self.isConnected():
-                time.sleep(0.01)
-                loops += 1
-                if loops > 10:
-                    warn( "Cannot install TBIntf to mininet Node; "
-                          "ns-3 has not connected yet to the TAP interface" )
-                    return
-        Intf.__init__( self, self.name, self.node, port=None )
-        self.mn_done = True
+    def namespaceMove( self ):
+        loops = 0
+        while not self.isConnected():
+            time.sleep(0.01)
+            loops += 1
+            if loops > 10:
+                warn( "Cannot move TBIntf to mininet Node namespace: "
+                      "ns-3 has not connected yet to the TAP interface\n" )
+                return
+        moveIntf( self.name, self.node )
+        self.inRightNamespace = True
+        # IP address has been reset while moving to namespace, needs to be set again
+        if self.ip is not None:
+            self.setIP( self.ip, self.prefixLen )
+        # The same for 'up'
+        self.isUp( True )
 
     def isConnected( self ):
         return self.tapbridge.IsLinkUp()
@@ -133,3 +130,16 @@ class TBIntf( Intf ):
     def isInstant( self ):
         return False # to be implemented in ns-3
 
+    def cmd( self, *args, **kwargs ):
+        "Run a command in our owning node or in root namespace when not yet inRightNamespace"
+        if self.inRightNamespace:
+            return self.node.cmd( *args, **kwargs )
+        else:
+            cmd = ' '.join( [ str( c ) for c in args ] )
+            return errRun( cmd )[ 0 ]
+
+    def rename( self, newname ):
+        "Rename interface"
+        if self.nsInstalled and not self.isConnected():
+            self.tapbridge.SetAttribute ( "DeviceName", ns.core.StringValue( newname ) )
+        Intf.rename( self, newname )
