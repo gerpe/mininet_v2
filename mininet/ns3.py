@@ -14,25 +14,26 @@ import ns.core
 import ns.network
 import ns.tap_bridge
 
+
 default_duration = 3600
 
 ns.core.GlobalValue.Bind( "SimulatorImplementationType", ns.core.StringValue( "ns3::RealtimeSimulatorImpl" ) )
 ns.core.GlobalValue.Bind( "ChecksumEnabled", ns.core.BooleanValue ( "true" ) )
 
-allIntfs = []
+allTBIntfs = []
 
 def start():
     global thread
     if 'thread' in globals() and thread.isAlive():
         warn( "NS-3 simulator thread already running." )
         return
-    for intf in allIntfs:
+    for intf in allTBIntfs:
         if not intf.nsInstalled:
             intf.nsInstall()
     thread = threading.Thread( target = runthread )
     thread.daemon = True
     thread.start()
-    for intf in allIntfs:
+    for intf in allTBIntfs:
         if not intf.inRightNamespace:
             intf.namespaceMove()
     return
@@ -51,16 +52,16 @@ def clear():
     if thread.isAlive():
         stop()
     ns.core.Simulator.Destroy()
-    for intf in allIntfs:
+    for intf in allTBIntfs:
         intf.nsInstalled = False
         intf.delete()
-    del allIntfs[:]
+    del allTBIntfs[:]
     return
 
 
 class TBIntf( Intf ):
-    def  __init__( self, name, node, port=None, 
-                   nsNode=None, nsDevice=None, mode=None, **params ):
+    def __init__( self, name, node, port=None,
+                  nsNode=None, nsDevice=None, mode=None, **params ):
         """
         """
         self.name = name
@@ -71,7 +72,7 @@ class TBIntf( Intf ):
         else:
             self.inRightNamespace = True
         Intf.__init__( self, name, node, port , **params)
-        allIntfs.append( self )
+        allTBIntfs.append( self )
         self.nsNode = nsNode
         self.nsDevice = nsDevice
         self.mode = mode
@@ -114,7 +115,7 @@ class TBIntf( Intf ):
     def namespaceMove( self ):
         loops = 0
         while not self.isConnected():
-            time.sleep(0.01)
+            time.sleep( 0.01 )
             loops += 1
             if loops > 10:
                 warn( "Cannot move TBIntf to mininet Node namespace: "
@@ -155,3 +156,35 @@ class TBIntf( Intf ):
                   "run mininet.ns3.clear() to delete all ns-3 devices\n" )
         else:
             Intf.delete( self )
+
+
+class SimpleSegment( object ):
+    def __init__( self ):
+        self.channel = ns.network.SimpleChannel()
+
+    def add( self, node, port=None, intfName=None ):
+        if hasattr( node, 'nsNode' ) and node.nsNode is not None:
+            pass
+        else:
+            node.nsNode = ns.network.Node()
+        device = ns.network.SimpleNetDevice()
+        device.SetChannel(self.channel)
+        node.nsNode.AddDevice(device)
+        if port is None:
+            port = node.newPort()
+        if intfName is None:
+            intfName = Link.intfName( node, port ) # classmethod
+        tb = TBIntf( intfName, node, port, node.nsNode, device )
+        return tb
+
+
+class SimpleLink( SimpleSegment, Link ):
+    def __init__( self, node1, node2, port1=None, port2=None,
+                  intfName1=None, intfName2=None ):
+        self.segment = SimpleSegment()
+        intf1 = self.segment.add( node1, port1, intfName1 )
+        intf2 = self.segment.add( node2, port2, intfName2 )
+        intf1.link = self
+        intf2.link = self
+        self.intf1, self.intf2 = intf1, intf2
+
