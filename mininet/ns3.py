@@ -51,6 +51,10 @@ def clear():
     if thread.isAlive():
         stop()
     ns.core.Simulator.Destroy()
+    for intf in allIntfs:
+        intf.nsInstalled = False
+        intf.delete()
+    del allIntfs[:]
     return
 
 
@@ -143,3 +147,11 @@ class TBIntf( Intf ):
         if self.nsInstalled and not self.isConnected():
             self.tapbridge.SetAttribute ( "DeviceName", ns.core.StringValue( newname ) )
         Intf.rename( self, newname )
+
+    def delete( self ):
+        "Delete interface"
+        if self.nsInstalled:
+            warn( "You can not delete once installed ns-3 device, "
+                  "run mininet.ns3.clear() to delete all ns-3 devices\n" )
+        else:
+            Intf.delete( self )
