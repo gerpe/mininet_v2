@@ -13,6 +13,7 @@ from mininet.util import quietRun, moveIntf, errRun
 import ns.core
 import ns.network
 import ns.tap_bridge
+import ns.csma
 
 
 default_duration = 3600
@@ -21,6 +22,7 @@ ns.core.GlobalValue.Bind( "SimulatorImplementationType", ns.core.StringValue( "n
 ns.core.GlobalValue.Bind( "ChecksumEnabled", ns.core.BooleanValue ( "true" ) )
 
 allTBIntfs = []
+allNodes = []
 
 def start():
     global thread
@@ -55,7 +57,10 @@ def clear():
     for intf in allTBIntfs:
         intf.nsInstalled = False
         intf.delete()
+    for node in allNodes:
+        del node.nsNode
     del allTBIntfs[:]
+    del allNodes[:]
     return
 
 
@@ -167,6 +172,7 @@ class SimpleSegment( object ):
             pass
         else:
             node.nsNode = ns.network.Node()
+            allNodes.append( node )
         device = ns.network.SimpleNetDevice()
         device.SetChannel(self.channel)
         node.nsNode.AddDevice(device)
@@ -181,10 +187,49 @@ class SimpleSegment( object ):
 class SimpleLink( SimpleSegment, Link ):
     def __init__( self, node1, node2, port1=None, port2=None,
                   intfName1=None, intfName2=None ):
-        self.segment = SimpleSegment()
-        intf1 = self.segment.add( node1, port1, intfName1 )
-        intf2 = self.segment.add( node2, port2, intfName2 )
+        SimpleSegment.__init__( self )
+        intf1 = SimpleSegment.add( self, node1, port1, intfName1 )
+        intf2 = SimpleSegment.add( self, node2, port2, intfName2 )
         intf1.link = self
         intf2.link = self
         self.intf1, self.intf2 = intf1, intf2
+
+
+class CSMASegment( object ):
+    def __init__( self, DataRate=None, Delay=None ):
+        self.channel = ns.csma.CsmaChannel()
+        if DataRate is not None:
+            self.channel.SetAttribute( "DataRate", ns.network.DataRateValue( ns.network.DataRate( DataRate ) ) )
+        if Delay is not None:
+            self.channel.SetAttribute( "Delay", ns.core.TimeValue( ns.core.Time( Delay ) ) )
+
+    def add( self, node, port=None, intfName=None ):
+        if hasattr( node, 'nsNode' ) and node.nsNode is not None:
+            pass
+        else:
+            node.nsNode = ns.network.Node()
+            allNodes.append( node )
+        device = ns.csma.CsmaNetDevice()
+        queue = ns.network.DropTailQueue()
+        device.Attach(self.channel)
+        device.SetQueue(queue)
+        node.nsNode.AddDevice(device)
+        if port is None:
+            port = node.newPort()
+        if intfName is None:
+            intfName = Link.intfName( node, port ) # classmethod
+        tb = TBIntf( intfName, node, port, node.nsNode, device )
+        return tb
+
+
+class CSMALink( CSMASegment, Link ):
+    def __init__( self, node1, node2, port1=None, port2=None,
+                  intfName1=None, intfName2=None, DataRate=None, Delay=None ):
+        CSMASegment.__init__( self, DataRate, Delay )
+        intf1 = CSMASegment.add( self, node1, port1, intfName1 )
+        intf2 = CSMASegment.add( self, node2, port2, intfName2 )
+        intf1.link = self
+        intf2.link = self
+        self.intf1, self.intf2 = intf1, intf2
+
 
