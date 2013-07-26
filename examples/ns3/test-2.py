@@ -12,8 +12,6 @@ from mininet.cli import CLI
 import mininet.ns3
 from mininet.ns3 import SimpleSegment
 
-import ns.network
-
 readline.parse_and_bind("tab: complete")
 
 

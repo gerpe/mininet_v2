@@ -27,12 +27,10 @@ if __name__ == '__main__':
     h0 = Node( 'h0' )
     h1 = Node( 'h1' )
     h2 = Node( 'h2' )
-    h3 = Node( 'h3' )
 
     net.hosts.append( h0 )
     net.hosts.append( h1 )
     net.hosts.append( h2 )
-    net.hosts.append( h3 )
 
 #   NS part ------------------------------------------------------
 
