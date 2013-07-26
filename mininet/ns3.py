@@ -51,8 +51,6 @@ def stop():
     return
 
 def clear():
-    if thread.isAlive():
-        stop()
     ns.core.Simulator.Destroy()
     for intf in allTBIntfs:
         intf.nsInstalled = False
