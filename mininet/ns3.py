@@ -14,6 +14,8 @@ import ns.core
 import ns.network
 import ns.tap_bridge
 import ns.csma
+import ns.wifi
+import ns.mobility
 
 
 default_duration = 3600
@@ -60,6 +62,38 @@ def clear():
     del allTBIntfs[:]
     del allNodes[:]
     return
+
+def getPosition( node ):
+    ''' Return the ns-3 (x, y, z) position of a node.
+    '''
+    if hasattr( node, 'nsNode' ) and node.nsNode is not None:
+        pass
+    else:
+        node.nsNode = ns.network.Node()
+        allNodes.append( node )
+    try:
+        mm = node.nsNode.GetObject(ns.mobility.MobilityModel.GetTypeId())
+        pos = mm.GetPosition()
+        return (pos.x, pos.y, pos.z)
+    except AttributeError:
+        warn("ns-3 mobility model not found\n")
+        return (0,0,0)
+
+def setPosition( node, x, y, z ):
+    ''' Set the ns-3 (x, y, z) position of a node.
+    '''
+    if hasattr( node, 'nsNode' ) and node.nsNode is not None:
+        pass
+    else:
+        node.nsNode = ns.network.Node()
+        allNodes.append( node )
+    try:
+        mm = node.nsNode.GetObject(ns.mobility.MobilityModel.GetTypeId())
+        if z is None:
+            z = 0.0
+        pos = mm.SetPosition(ns.core.Vector(x, y, z))
+    except AttributeError:
+        warn("ns-3 mobility model not found, not setting position\n")
 
 
 class TBIntf( Intf ):
@@ -229,5 +263,33 @@ class CSMALink( CSMASegment, Link ):
         intf1.link = self
         intf2.link = self
         self.intf1, self.intf2 = intf1, intf2
+
+
+class WIFISegment( object ):
+    def __init__( self ):
+        # Helpers instantiation
+        self.channelhelper = ns.wifi.YansWifiChannelHelper.Default()
+        self.phyhelper = ns.wifi.YansWifiPhyHelper.Default()
+        self.wifihelper = ns.wifi.WifiHelper.Default()
+        self.machelper = ns.wifi.NqosWifiMacHelper.Default()
+        # Setting channel to phyhelper
+        self.channel = self.channelhelper.Create()
+        self.phyhelper.SetChannel( self.channel )
+
+    def add( self, node, port=None, intfName=None ):
+        if hasattr( node, 'nsNode' ) and node.nsNode is not None:
+            pass
+        else:
+            node.nsNode = ns.network.Node()
+            allNodes.append( node )
+        device = self.wifihelper.Install( self.phyhelper, self.machelper, node.nsNode ).Get( 0 )
+        mobilityhelper = ns.mobility.MobilityHelper()
+        mobilityhelper.Install( node.nsNode )
+        if port is None:
+            port = node.newPort()
+        if intfName is None:
+            intfName = Link.intfName( node, port ) # classmethod
+        tb = TBIntf( intfName, node, port, node.nsNode, device )
+        return tb
 
 
