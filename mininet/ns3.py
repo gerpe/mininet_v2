@@ -314,3 +314,50 @@ class WIFIApStaLink( WIFISegment, Link ):
         self.intf1, self.intf2 = intf1, intf2
 
 
+class WIFIBridgeLink( WIFISegment, Link ):
+    def __init__( self, node1, node2, port1=None, port2=None,
+                  intfName1=None, intfName2=None ):
+        WIFISegment.__init__( self )
+        #
+        if hasattr( node1, 'nsNode' ) and node1.nsNode is not None:
+            pass
+        else:
+            node1.nsNode = ns.network.Node()
+            allNodes.append( node1 )
+        mobilityhelper1 = ns.mobility.MobilityHelper()
+        mobilityhelper1.Install( node1.nsNode )
+        if port1 is None:
+            port1 = node1.newPort()
+        if intfName1 is None:
+            intfName1 = Link.intfName( node1, port1 ) # classmethod
+        tb1 = TBIntf( intfName1, node1, port1, node1.nsNode )
+        #
+        if hasattr( node2, 'nsNode' ) and node2.nsNode is not None:
+            pass
+        else:
+            node2.nsNode = ns.network.Node()
+            allNodes.append( node2 )
+        mobilityhelper2 = ns.mobility.MobilityHelper()
+        mobilityhelper2.Install( node2.nsNode )
+        if port2 is None:
+            port2 = node2.newPort()
+        if intfName2 is None:
+            intfName2 = Link.intfName( node2, port2 ) # classmethod
+        tb2 = TBIntf( intfName2, node2, port2, node2.nsNode )
+        #
+        self.machelper.SetType ("ns3::WDSWifiMac",
+                                "ReceiverAddress", ns.network.Mac48AddressValue( ns.network.Mac48Address( tb2.MAC() ) ) )
+        device1 = self.wifihelper.Install( self.phyhelper, self.machelper, node1.nsNode ).Get( 0 )
+        tb1.nsDevice = device1
+        tb1.nsInstall()
+        #
+        self.machelper.SetType ("ns3::WDSWifiMac",
+                                "ReceiverAddress", ns.network.Mac48AddressValue( ns.network.Mac48Address( tb1.MAC() ) ) )
+        device2 = self.wifihelper.Install( self.phyhelper, self.machelper, node2.nsNode ).Get( 0 )
+        tb2.nsDevice = device2
+        tb2.nsInstall()
+        #
+        tb1.link = self
+        tb2.link = self
+        self.intf1, self.intf2 = tb1, tb2
+
