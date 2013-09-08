@@ -303,3 +303,14 @@ class WIFISegment( object ):
         return self.add( node, port, intfName )
 
 
+class WIFIApStaLink( WIFISegment, Link ):
+    def __init__( self, node1, node2, port1=None, port2=None,
+                  intfName1=None, intfName2=None, ssid="default-ssid" ):
+        WIFISegment.__init__( self )
+        intf1 = WIFISegment.addAp( self, node1, port1, intfName1, ssid )
+        intf2 = WIFISegment.addSta( self, node2, port2, intfName2, ssid )
+        intf1.link = self
+        intf2.link = self
+        self.intf1, self.intf2 = intf1, intf2
+
+
