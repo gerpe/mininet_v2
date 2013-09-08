@@ -292,4 +292,14 @@ class WIFISegment( object ):
         tb = TBIntf( intfName, node, port, node.nsNode, device )
         return tb
 
+    def addAp( self, node, port=None, intfName=None, ssid="default-ssid" ):
+        self.machelper.SetType ("ns3::ApWifiMac", "Ssid", ns.wifi.SsidValue (ns.wifi.Ssid(ssid)),
+                                "BeaconGeneration", ns.core.BooleanValue(True),
+                                "BeaconInterval", ns.core.TimeValue(ns.core.Seconds(2.5)))
+        return self.add( node, port, intfName )
+
+    def addSta( self, node, port=None, intfName=None, ssid="default-ssid" ):
+        self.machelper.SetType ("ns3::StaWifiMac", "Ssid", ns.wifi.SsidValue (ns.wifi.Ssid(ssid)))
+        return self.add( node, port, intfName )
+
 
