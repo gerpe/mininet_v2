@@ -11,7 +11,7 @@ from mininet.cli import CLI
 from mininet.log import setLogLevel, info
 
 import mininet.ns3                          # line added
-from mininet.ns3 import WIFILink            # line added
+from mininet.ns3 import WIFIApStaLink            # line added
 
 def emptyNet():
 

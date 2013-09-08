@@ -158,6 +158,7 @@ class TBIntf( Intf ):
                 warn( "Cannot move TBIntf to mininet Node namespace: "
                       "ns-3 has not connected yet to the TAP interface\n" )
                 return
+        time.sleep( 0.01 )
         moveIntf( self.name, self.node )
         self.inRightNamespace = True
         # IP address has been reset while moving to namespace, needs to be set again
