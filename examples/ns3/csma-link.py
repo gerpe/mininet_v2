@@ -1,8 +1,3 @@
-import rlcompleter
-import readline
-
-import time
-
 from mininet.net import Mininet
 from mininet.node import Node, Switch
 from mininet.link import Link, Intf
@@ -10,10 +5,7 @@ from mininet.log import setLogLevel, info
 from mininet.cli import CLI
 
 import mininet.ns3
-from mininet.ns3 import SimpleLink
-
-readline.parse_and_bind("tab: complete")
-
+from mininet.ns3 import CSMALink
 
 
 if __name__ == '__main__':
@@ -28,7 +20,7 @@ if __name__ == '__main__':
     net.hosts.append( h0 )
     net.hosts.append( h1 )
 
-    link = SimpleLink( h0, h1 )   
+    link = CSMALink( h0, h1 )
 
     mininet.ns3.start()
 

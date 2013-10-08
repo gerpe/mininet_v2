@@ -1,8 +1,3 @@
-import rlcompleter
-import readline
-
-import time
-
 from mininet.net import Mininet
 from mininet.node import Node, Switch
 from mininet.link import Link, Intf
@@ -14,9 +9,6 @@ from mininet.ns3 import WIFISegment
 
 import ns.core
 import ns.wifi
-
-readline.parse_and_bind("tab: complete")
-
 
 
 if __name__ == '__main__':
